@@ -1,0 +1,9 @@
+# https://docs.python.org/2/library/datetime.html#strftime-strptime-behavior
+broadcast_date_format = '%Y%m%d'
+
+# Possible values: [ignore, remove, move].
+no_audio_action = ignore
+
+[dir]
+    audio = '/home/usuario/radio/programas'
+    log = '/home/usuario/radio/audio_date_formatter.log'
