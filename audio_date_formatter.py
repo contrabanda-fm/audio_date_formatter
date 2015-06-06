@@ -24,6 +24,7 @@ from datetime import date, datetime
 from subprocess import check_output, CalledProcessError
 from logging import getLogger, FileHandler, Formatter, INFO
 from time import gmtime
+from sys import argv
 
 config = ConfigObj('config')
 handler = FileHandler(config['dir']['log'])
@@ -50,8 +51,6 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 logger.setLevel(INFO)
 
-today = date.today().strftime(config['broadcast_date_format'])
-
 def if_audio_ensure_mp3(path_file):
     "If audio file makes sure is .mp3 file, if not it converts to it"
     # TODO: sndhdr not working
@@ -63,12 +62,17 @@ def if_audio_ensure_mp3(path_file):
         path_file_ogg, extension_ogg = splitext(path_file)
         path_file_mp3 = path_file_ogg + '.mp3'
         try:
+            ''' TODO: try/excet this block
             check_output(['ffmpeg', '-y', '-loglevel', '-8', '-y', '-i',
                          path_file, '-acodec', 'libmp3lame', path_file_mp3])
+            '''
+            check_output(['avconv', '-y', '-loglevel', 'quiet', '-i',
+                         path_file, '-c:a', 'libmp3lame', '-q:a', '2',
+                         path_file_mp3])
         except CalledProcessError, e:
             logger.error(
                  'Not able to convert from .ogg to .mp3 file %s. Eception: %s'\
-                         %(path_file, e)) 
+                         %(path_file, e))
         else:
             try:
                 unlink(path_file)
@@ -132,6 +136,10 @@ def date_format(audio_dir, program, filename):
     finally:
         return filename
 
+logger.info('START %s' %(argv[0]))
+
+today = date.today().strftime(config['broadcast_date_format'])
+
 for dir in listdir(config['dir']['audio']):
     path_dir = join(config['dir']['audio'],dir)
     file_list = listdir(path_dir)
@@ -151,7 +159,6 @@ for dir in listdir(config['dir']['audio']):
                     # TODO: implement
                     pass
                 logger.warning('No audio file. Ignoring "%s"' % (path_file))
-                break
             else:
                 # TODO: I need to set again file variable, since it can .mp3
                 file = basename(path_file)
@@ -159,13 +166,14 @@ for dir in listdir(config['dir']['audio']):
                 file_date = file.split('-')[0]
                 if next_broadcast == '':
                     next_broadcast = file
-                # If file between today and next_broadcast time to update link
-                elif ((next_broadcast < today and file_date > next_broadcast)\
-                     or (next_broadcast > today and file_date <\
-                         next_broadcast)):
+                elif ((file_date >= today and file_date < next_broadcast) or\
+                      (next_broadcast < today and file_date > next_broadcast)):
+
                     next_broadcast = file
         if next_broadcast == '':
             logger.warning('No suitable audio file for program "%s"' %\
                            (program))
         else:
             safe_link(config['dir']['audio'], program, next_broadcast)
+
+logger.info('END %s' %(argv[0]))
