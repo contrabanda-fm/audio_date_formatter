@@ -7,14 +7,17 @@ no_audio_action = ignore
 # Possible values: [ignore, rename].
 wrong_date_format_action = rename
 
+audio_file_ext = '.ogg'
+
 [audio_tags]
-    mp3 = 'Audio',
+    mp3 = 'Audio', 'layer III',
     ogg = 'Ogg',
 
 [dir]
-    audio = '/home/user/radio/programs'
+    #audio = '/home/contrabanda/continuidad/audios'
+    audio = '/home/contrabanda/continuidad/audios.test'
     log = '/var/log/audio_date_formatter.log'
-    # List, can be empty. No action should be taken. Spots, music, etc...
-    ignore = spots, music,
+    # No action should be taken. Spots, music, etc...
+    ignore = falcas, musica
 
-audio_file_ext = '.ogg'
+
