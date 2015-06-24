@@ -16,3 +16,5 @@ wrong_date_format_action = rename
     log = '/var/log/audio_date_formatter.log'
     # List, can be empty. No action should be taken. Spots, music, etc...
     ignore = spots, music,
+
+audio_file_ext = '.ogg'

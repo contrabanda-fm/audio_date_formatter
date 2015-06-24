@@ -23,7 +23,6 @@ from os.path import join, isdir, realpath, getmtime, splitext, basename
 from datetime import date, datetime
 from subprocess import check_output, CalledProcessError
 from logging import getLogger, FileHandler, Formatter, INFO
-from time import gmtime
 from sys import argv
 
 config = ConfigObj('config')
@@ -55,33 +54,31 @@ def if_audio_ensure_mp3(path_file):
     "If audio file makes sure is .mp3 file, if not it converts to it"
     # TODO: sndhdr not working
     # https://docs.python.org/2/library/sndhdr.html#module-sndhdr
-    file_type = check_output(['file', path_file]).split(': ')[1].strip()
-    if any(tag in file_type for tag in config['audio_tags']['mp3']):
-        pass
-    elif any(tag in file_type for tag in config['audio_tags']['ogg']):
-        path_file_ogg, extension_ogg = splitext(path_file)
-        path_file_mp3 = path_file_ogg + '.mp3'
-        try:
-            ''' TODO: try/excet this block
-            check_output(['ffmpeg', '-y', '-loglevel', '-8', '-y', '-i',
-                         path_file, '-acodec', 'libmp3lame', path_file_mp3])
-            '''
-            check_output(['avconv', '-y', '-loglevel', 'quiet', '-i',
-                         path_file, '-c:a', 'libmp3lame', '-q:a', '2',
-                         path_file_mp3])
-        except CalledProcessError, e:
-            logger.error(
-                 'Not able to convert from .ogg to .mp3 file %s. Eception: %s'\
-                         %(path_file, e))
-        else:
+    try:
+        if get_audio_type(path_file) == '.ogg':
+            path_file_ogg, extension_ogg = splitext(path_file)
+            path_file_mp3 = path_file_ogg + '.mp3'
             try:
-                unlink(path_file)
-            except OSError, e:
-                logger.warning('Not able to remove file %s. Eception: %s'\
-                               %(path_file, e))
-            return path_file_mp3
-    else:
-        raise NoAudioFile(path_file)
+                ''' TODO: try/excet this block
+                check_output(['ffmpeg', '-y', '-loglevel', '-8', '-y', '-i',
+                             path_file, '-acodec', 'libmp3lame', path_file_mp3])
+                '''
+                check_output(['avconv', '-y', '-loglevel', 'quiet', '-i',
+                             path_file, '-c:a', 'libmp3lame', '-q:a', '2',
+                             path_file_mp3])
+            except CalledProcessError, e:
+                logger.error(
+                     'Error converting from .ogg to .mp3 %s. Eception: %s'\
+                             %(path_file, e))
+            else:
+                try:
+                    unlink(path_file)
+                except OSError, e:
+                    logger.warning('Error removing %s. Eception: %s'\
+                                   %(path_file, e))
+                return path_file_mp3
+    except NoAudioFile:
+        raise
     return path_file
 
 def is_after(file, compared_date):
@@ -94,10 +91,14 @@ def safe_link(parent_path, program, file):
     "Creates a symlink if not already linked"
     # Check symlink is not already pointing to file
     # TODO: if aras recorder maybe the program.mp3 is a real file
-    if (realpath(join(config['dir']['audio'], dir, program + '.mp3')) !=
+    #if (realpath(join(config['dir']['audio'], dir, program + '.mp3')) !=
+    if (realpath(join(config['dir']['audio'], dir, program +
+                                                  config['audio_file_ext'])) !=
         join(config['dir']['audio'], dir, file)):
-        link_name = program + '.mp3'
+        #link_name = program + '.mp3'
+        link_name = program + config['audio_file_ext']
         chdir(join(config['dir']['audio'], dir)) 
+
         # Check if there's already a symlink pointing to a different file
         try:
             symlink(file, link_name)
@@ -122,19 +123,35 @@ def date_format(audio_dir, program, filename):
         datetime.strptime(broadcast_date, config['broadcast_date_format'])
     except ValueError:
         if config['wrong_date_format_action'] == 'rename':
-            struct_time = gmtime(getmtime(path_file))
-            # time.struct_time(tm_year=2015, tm_mon=6, tm_mday=3, tm_hour=18,
-            # tm_min=49, tm_sec=24, tm_wday=2, tm_yday=154, tm_isdst=0)
-            st_list = [str(ele).zfill(2) for ele in struct_time]
-            formatted_filename = '%s%s%s-%s%s%s-%s' %(st_list[0], st_list[1],\
-                                                      st_list[2], st_list[3],\
-                                                      st_list[4], st_list[5],\
-                                                      filename.replace(' ',''))
+            extension = get_audio_type(path_file)
+            formatted_filename = '%s-%s%s' %(today, program, extension)
+            # Rename the file
+            rename(join(audio_dir, program, filename),
+                   join(audio_dir, program, formatted_filename))
+            filename = formatted_filename
+    else:
+        # Date prefix is ok. Let's check file name is the program name
+        name, extension = splitext(filename)
+        program_name = '-%s' %(program)
+        if name.replace(broadcast_date, '', 1) != program_name:
+            # Rename the file
+            formatted_filename = '%s%s%s' %(broadcast_date, program_name,
+                                                                     extension)
+            # Rename the file
             rename(join(audio_dir, program, filename),
                    join(audio_dir, program, formatted_filename))
             filename = formatted_filename
     finally:
         return filename
+
+def get_audio_type(path_file):
+    "Returns either .mp3 or .ogg"
+    file_type = check_output(['file', path_file]).split(': ')[1].strip()
+    if any(tag in file_type for tag in config['audio_tags']['mp3']):
+        return '.mp3'
+    elif any(tag in file_type for tag in config['audio_tags']['ogg']):
+        return '.ogg'
+    raise NoAudioFile(path_file)
 
 logger.info('START %s' %(argv[0]))
 
@@ -142,9 +159,11 @@ today = date.today().strftime(config['broadcast_date_format'])
 
 for dir in listdir(config['dir']['audio']):
     path_dir = join(config['dir']['audio'],dir)
-    file_list = listdir(path_dir)
+    try:
+        file_list = listdir(path_dir)
+    except OSError as e:
+        logger.warning('File instead of a directory: %s' %(e))
 
-    # TODO: skip config['dir']['ignore']
     #if isdir(path_dir) and (len(file_list) > 0):
     if isdir(path_dir) and (len(file_list) > 0) and\
     not any(dir in ignored_dir for ignored_dir in config['dir']['ignore']):
