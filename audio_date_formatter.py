@@ -58,25 +58,37 @@ def if_audio_ensure_mp3(path_file):
         if get_audio_type(path_file) == '.ogg':
             path_file_ogg, extension_ogg = splitext(path_file)
             path_file_mp3 = path_file_ogg + '.mp3'
-            try:
-                ''' TODO: try/excet this block
-                check_output(['ffmpeg', '-y', '-loglevel', '-8', '-y', '-i',
-                             path_file, '-acodec', 'libmp3lame', path_file_mp3])
-                '''
-                check_output(['avconv', '-y', '-loglevel', 'quiet', '-i',
+
+            # TODO: add check to skip converting file pointed by simlink
+            # which is in use
+
+            if not is_file_open(path_file):
+                try:
+                    # Ubuntu
+                    check_output(['avconv', '-y', '-loglevel', 'quiet', '-i',
                              path_file, '-c:a', 'libmp3lame', '-q:a', '2',
                              path_file_mp3])
-            except CalledProcessError, e:
-                logger.error(
-                     'Error converting from .ogg to .mp3 %s. Eception: %s'\
-                             %(path_file, e))
+                except OSError:
+                    try:
+                        # Debian
+                        check_output(['ffmpeg', '-y', '-loglevel', '-8', '-y',
+                                  '-i', path_file, '-acodec', 'libmp3lame',
+                                  path_file_mp3])
+                    except CalledProcessError, e:
+                        logger.error('Error converting from .ogg to .mp3 %s.'\
+                                     'Eception: %s' %(path_file, e))
+                        return path_file
+                finally:
+                    try:
+                        unlink(path_file)
+                    except OSError, e:
+                        logger.warning('Error removing %s. Eception: %s'\
+                                       %(path_file, e))
+                    return path_file_mp3
             else:
-                try:
-                    unlink(path_file)
-                except OSError, e:
-                    logger.warning('Error removing %s. Eception: %s'\
-                                   %(path_file, e))
-                return path_file_mp3
+                logger.warning('File open. Can convert to mp3 file %s'
+                                       %(path_file))
+                # TODO: should I return path_file?
     except NoAudioFile:
         raise
     return path_file
@@ -106,14 +118,20 @@ def safe_link(parent_path, program, file):
             current_symlinked_file_path = realpath(join(\
                                                    config['dir']['audio'],
                                                    dir, link_name))
-            # Check if the current symlink is NOT being reproduced now
-            if check_output('lsof').find(current_symlinked_file_path) == -1:
+            # Check if the target of current symlink is NOT open now
+            if not is_file_open(current_symlinked_file_path):
                 unlink(link_name)
                 symlink(file, link_name)
             else:
                 logger.error(
                      'Symlink "%s" is currently being reproduced. Not able to'\
                              ' change it to point to "%s"' % (link_name, file))
+
+def is_file_open(path_file):
+    "Return false if file is not open"
+    if check_output('lsof').find(path_file) == -1:
+        return False
+    return True
 
 def date_format(audio_dir, program, filename):
     "Validates date format or rename the file to make it date format compliant"
