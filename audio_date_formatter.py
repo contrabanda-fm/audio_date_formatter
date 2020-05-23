@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 '''
     Copyright 2015 Javier Legido javi@legido.com
 
@@ -74,14 +74,14 @@ def if_audio_ensure_mp3(path_file):
                         check_output(['ffmpeg', '-y', '-loglevel', '-8', '-y',
                                   '-i', path_file, '-acodec', 'libmp3lame',
                                   path_file_mp3])
-                    except CalledProcessError, e:
+                    except CalledProcessError as e:
                         logger.error('Error converting from .ogg to .mp3 %s.'\
                                      'Eception: %s' %(path_file, e))
                         return path_file
                 finally:
                     try:
                         unlink(path_file)
-                    except OSError, e:
+                    except OSError as e:
                         logger.warning('Error removing %s. Eception: %s'\
                                        %(path_file, e))
                     return path_file_mp3
@@ -114,7 +114,7 @@ def safe_link(parent_path, program, file):
         # Check if there's already a symlink pointing to a different file
         try:
             symlink(file, link_name)
-        except OSError, e:
+        except OSError as e:
             current_symlinked_file_path = realpath(join(\
                                                    config['dir']['audio'],
                                                    dir, link_name))
@@ -129,7 +129,7 @@ def safe_link(parent_path, program, file):
 
 def is_file_open(path_file):
     "Return false if file is not open"
-    if check_output('lsof').find(path_file) == -1:
+    if str(check_output('lsof')).find(path_file) == -1:
         return False
     return True
 
@@ -164,7 +164,7 @@ def date_format(audio_dir, program, filename):
 
 def get_audio_type(path_file):
     "Returns either .mp3 or .ogg"
-    file_type = check_output(['file', path_file]).split(': ')[1].strip()
+    file_type = str(check_output(['file', path_file])).split(': ')[1].strip()
     if any(tag in file_type for tag in config['audio_tags']['mp3']):
         return '.mp3'
     elif any(tag in file_type for tag in config['audio_tags']['ogg']):

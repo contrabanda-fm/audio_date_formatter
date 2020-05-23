@@ -5,7 +5,7 @@ broadcast_date_format = '%Y%m%d'
 no_audio_action = ignore
 
 # Possible values: [ignore, rename].
-wrong_date_format_action = rename
+wrong_date_format_action = ignore
 
 audio_file_ext = '.ogg'
 
@@ -14,10 +14,8 @@ audio_file_ext = '.ogg'
     ogg = 'Ogg',
 
 [dir]
-    #audio = '/home/contrabanda/continuidad/audios'
-    audio = '/home/contrabanda/continuidad/audios.test'
+    audio = '/home/contrabanda/continuidad/audios'
     log = '/var/log/audio_date_formatter.log'
     # No action should be taken. Spots, music, etc...
     ignore = falcas, musica
-
 
